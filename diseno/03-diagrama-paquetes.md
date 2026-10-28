@@ -7,7 +7,7 @@ Los diagramas de paquetes siguen la forma que dio el profesor:
 
 El backend y el frontend se organizan por los **mismos módulos de negocio**: `acceso`, `ingresos`, `egresos` y `movimientos`, más un paquete `compartido`. En los dos diagramas, `ingresos` (mi funcionalidad) va primero.
 
-Los diagramas están hechos en draw.io: [`img/paquetes-backend.drawio`](img/paquetes-backend.drawio) y [`img/paquetes-frontend.drawio`](img/paquetes-frontend.drawio) se abren y se editan en [app.diagrams.net](https://app.diagrams.net). Cada paquete es un contenedor, así que al mover uno se mueve con todo lo que tiene adentro. Las imágenes `.drawio.svg` también se pueden editar ahí.
+Los diagramas están hechos en draw.io: [`img/paquetes-backend.drawio`](img/paquetes-backend.drawio), [`img/paquetes-frontend.drawio`](img/paquetes-frontend.drawio) y [`img/paquetes-api-gateway.drawio`](img/paquetes-api-gateway.drawio) se abren y se editan en [app.diagrams.net](https://app.diagrams.net). Cada paquete es un contenedor, así que al mover uno se mueve con todo lo que tiene adentro. Las imágenes `.drawio.svg` también se pueden editar ahí.
 
 ## 1. Backend (Java · Spring Boot)
 
@@ -138,36 +138,21 @@ En local, Vite reenvía `/api/...` al backend (`http://localhost:8080`) quitando
 
 ## 3. API Gateway
 
-El gateway no tiene código: es un archivo **OpenAPI 2.0** (`infra/api-gateway/openapi.yaml`, en el repositorio del backend) que Google Cloud API Gateway lee. Sus "paquetes" son las secciones de ese archivo, y las rutas se agrupan con `tags` por módulo, igual que en el backend.
+El gateway no tiene código: es un archivo **OpenAPI 2.0** que lee Google Cloud API Gateway. Va en el repositorio del backend, en `infra/api-gateway/openapi.yaml`, y se crea cuando se monte la nube (ADR-0017). Sus "paquetes" son las secciones de ese archivo, y las rutas se agrupan con `tags` por módulo, igual que en el backend y el frontend.
 
-```mermaid
-flowchart TB
-    subgraph infra["infra/api-gateway"]
-        subgraph spec["openapi.yaml"]
-            info["info · host<br/>schemes https"]
-            seg["securityDefinitions<br/><i>firebase: x-google-issuer, x-google-jwks_uri, x-google-audiences</i>"]
-            back["x-google-backend<br/><i>address CLOUD_RUN_URL · APPEND_PATH_TO_ADDRESS · jwt_audience</i>"]
-            subgraph paths["paths"]
-                pAcc["tag acceso<br/><i>/api/acceso/cafeterias · /api/acceso/yo</i>"]
-                pIng["tag ingresos<br/><i>/api/ingresos · /api/ingresos/libres · /api/ingresos/catalogo<br/>/api/ingresos/{idVenta}/deshacer</i>"]
-                pEgr["tag egresos<br/><i>/api/egresos</i>"]
-                pMov["tag movimientos<br/><i>/api/movimientos</i>"]
-                pOpt["OPTIONS de cada ruta<br/><i>sin security, para el preflight de CORS</i>"]
-            end
-        end
-        leeme["README.md<br/><i>cómo crear la API, la configuración y el gateway con gcloud</i>"]
-    end
+![Diagrama de paquetes del API Gateway](img/paquetes-api-gateway.drawio.svg)
 
-    pAcc -.->|«use»| seg
-    pIng -.->|«use»| seg
-    pEgr -.->|«use»| seg
-    pMov -.->|«use»| seg
-    paths -.->|«use»| back
-    leeme -.->|«use»| spec
+Aquí las flechas son **`«use»`** y no `«import»`, porque un YAML no importa código: cada sección **usa** otra que está definida en el mismo archivo.
 
-    classDef gwC fill:#e1d5e7,stroke:#9673a6,color:#000
-    class info,seg,back,pAcc,pIng,pEgr,pMov,pOpt,leeme gwC
-```
+- Cada grupo de rutas (`acceso`, `ingresos`, `egresos`, `movimientos`) usa `securityDefinitions.firebase`: toda ruta exige el token de Firebase.
+- `paths` usa `x-google-backend`: todas las rutas van al mismo backend en Cloud Run.
+
+| Grupo (`tag`) | Rutas |
+|---|---|
+| `acceso` | `/api/acceso/cafeterias`, `/api/acceso/yo` |
+| `ingresos` | `/api/ingresos`, `/api/ingresos/libres`, `/api/ingresos/catalogo`, `/api/ingresos/{idVenta}/deshacer` |
+| `egresos` | `/api/egresos` |
+| `movimientos` | `/api/movimientos` |
 
 | Sección | Qué contiene | Decisión |
 |---|---|---|
